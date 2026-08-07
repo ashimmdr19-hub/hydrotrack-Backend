@@ -1,5 +1,6 @@
 const User = require('../models/User');
-const admin = require('../firebase'); // Adjust path if firebase.js is in root (e.g., '../../firebase')
+require('../firebase'); // Ensure Firebase Admin is initialized
+const { getMessaging } = require('firebase-admin/messaging');
 
 const getProfile = async (userId) => {
   const user = await User.findById(userId).select('-password');
@@ -71,7 +72,7 @@ const sendPushNotification = async (userId, title, body) => {
   };
 
   try {
-    const response = await admin.messaging().sendEachForMulticast(message);
+    const response = await getMessaging().sendEachForMulticast(message);
     
     // Clean up expired or invalid tokens automatically
     if (response.failureCount > 0) {
