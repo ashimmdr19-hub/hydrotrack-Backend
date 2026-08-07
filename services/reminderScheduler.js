@@ -9,12 +9,62 @@ const startOfDay = (date) => {
   return d;
 };
 
+const { getPeriodKey } = require('../utils/ema');
+
 /**
-  Checks users and sends water reminders if needed
+ * Gets the period information (name, EMA field, default fraction of daily goal, and cumulative period targets).
+ */
+const getPeriodDetails = (now = new Date()) => {
+  const hour = now.getHours();
+  if (hour < 12) {
+    return {
+      periodName: 'Morning',
+      periodKey: 'emaMorning',
+      defaultRatio: 0.3,
+      periodIndex: 0,
+    };
+  } else if (hour < 18) {
+    return {
+      periodName: 'Afternoon',
+      periodKey: 'emaAfternoon',
+      defaultRatio: 0.4,
+      periodIndex: 1,
+    };
+  } else {
+    return {
+      periodName: 'Evening',
+      periodKey: 'emaEvening',
+      defaultRatio: 0.3,
+      periodIndex: 2,
+    };
+  }
+};
+
+/**
+ * Calculates cumulative expected water intake (ml) up to the current period.
+ */
+const getCumulativeExpectedTarget = (user, periodDetails) => {
+  const morningExp = user.emaMorning > 0 ? user.emaMorning : user.dailyGoal * 0.3;
+  const afternoonExp = user.emaAfternoon > 0 ? user.emaAfternoon : user.dailyGoal * 0.4;
+  const eveningExp = user.emaEvening > 0 ? user.emaEvening : user.dailyGoal * 0.3;
+
+  if (periodDetails.periodIndex === 0) {
+    return Math.round(morningExp);
+  } else if (periodDetails.periodIndex === 1) {
+    return Math.round(morningExp + afternoonExp);
+  } else {
+    return user.dailyGoal;
+  }
+};
+
+/**
+  Checks users and sends adaptive EMA-based water reminders if needed
  */
 const checkAndSendReminders = async () => {
   try {
-    const todayStart = startOfDay(new Date());
+    const now = new Date();
+    const todayStart = startOfDay(now);
+    const periodDetails = getPeriodDetails(now);
     
     // Find all users who have active device tokens registered
     const users = await User.find({
@@ -30,18 +80,42 @@ const checkAndSendReminders = async () => {
 
       const totalToday = todayLogs.reduce((sum, log) => sum + log.amount, 0);
 
-      // If user hasn't met their daily goal, send a friendly reminder push notification
-      if (totalToday < user.dailyGoal) {
-        const remaining = user.dailyGoal - totalToday;
-        const title = '💧 Water Reminder!';
-        const body = `Hi ${user.name || 'there'}! You've logged ${totalToday}ml out of ${user.dailyGoal}ml today. Drink ${remaining}ml more to reach your goal!`;
+      // If user has already reached their daily goal, skip reminder
+      if (totalToday >= user.dailyGoal) {
+        continue;
+      }
 
-        try {
-          await userService.sendPushNotification(user._id, title, body);
-          console.log(`✅ Push reminder sent to user: ${user.email}`);
-        } catch (err) {
-          console.error(`⚠️ Failed to send reminder to ${user.email}:`, err.message);
-        }
+      // Calculate cumulative expected intake up to current period
+      const cumulativeTarget = getCumulativeExpectedTarget(user, periodDetails);
+
+      // If user is already on track for the current period, skip sending notification (prevents notification fatigue)
+      if (totalToday >= cumulativeTarget) {
+        console.log(`ℹ️ User ${user.email} is on track for ${periodDetails.periodName} (${totalToday}ml / target ${cumulativeTarget}ml). Skipping notification.`);
+        continue;
+      }
+
+      // Calculate current period expected EMA volume
+      const currentPeriodEma = user[periodDetails.periodKey];
+      const hasEmaHistory = currentPeriodEma && currentPeriodEma > 0;
+      const periodExpectedVolume = hasEmaHistory
+        ? Math.round(currentPeriodEma)
+        : Math.round(user.dailyGoal * periodDetails.defaultRatio);
+
+      const remaining = user.dailyGoal - totalToday;
+      const title = `💧 ${periodDetails.periodName} Hydration Reminder!`;
+      
+      let body;
+      if (hasEmaHistory) {
+        body = `Hi ${user.name || 'there'}! Based on your routine, you usually drink ~${periodExpectedVolume}ml in the ${periodDetails.periodName.toLowerCase()}. You've logged ${totalToday}ml out of ${user.dailyGoal}ml today. Drink ${remaining}ml more to reach your goal!`;
+      } else {
+        body = `Hi ${user.name || 'there'}! You've logged ${totalToday}ml out of ${user.dailyGoal}ml today. Drink ${remaining}ml more to reach your ${periodDetails.periodName.toLowerCase()} goal!`;
+      }
+
+      try {
+        await userService.sendPushNotification(user._id, title, body);
+        console.log(`✅ EMA Adaptive push reminder sent to user: ${user.email} (${periodDetails.periodName})`);
+      } catch (err) {
+        console.error(`⚠️ Failed to send reminder to ${user.email}:`, err.message);
       }
     }
   } catch (error) {
@@ -60,7 +134,7 @@ const initReminderScheduler = () => {
     checkAndSendReminders();
   });
 
-  console.log('🔔 Hydration Reminder Scheduler initialized successfully (runs every 2 hours between 8 AM - 9 PM)');
+  console.log('🔔 EMA-Adaptive Hydration Reminder Scheduler initialized successfully (runs every 2 hours between 8 AM - 9 PM)');
 };
 
 module.exports = {
