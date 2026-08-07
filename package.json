@@ -24,7 +24,8 @@
     "jsonwebtoken": "^9.0.3",
     "mongodb-memory-server": "^10.0.0",
     "mongoose": "^9.6.3",
-    "morgan": "^1.10.0"
+    "morgan": "^1.10.0",
+    "node-cron": "^3.0.3"
   },
   "devDependencies": {
     "nodemon": "^3.0.1"

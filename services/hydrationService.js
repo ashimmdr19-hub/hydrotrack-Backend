@@ -160,48 +160,14 @@ const getAdaptiveReminderTimes = (user) => {
   };
 };
 
+const userService = require('./userService');
+
 const sendPushReminder = async (user) => {
-  if (!process.env.FCM_SERVER_KEY) {
-    const err = new Error('FCM_SERVER_KEY is not configured');
-    err.statusCode = 500;
-    throw err;
-  }
-
-  const tokens = (user.deviceTokens || []).filter(Boolean);
-  if (!tokens.length) {
-    const err = new Error('No registered device tokens for user');
-    err.statusCode = 404;
-    throw err;
-  }
-
-  const message = {
-    registration_ids: tokens,
-    notification: {
-      title: 'Hydration reminder',
-      body: 'Time to drink water and stay on track with your hydration goals!',
-    },
-    data: {
-      type: 'hydration_reminder',
-    },
-  };
-
-  const response = await fetch('https://fcm.googleapis.com/fcm/send', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `key=${process.env.FCM_SERVER_KEY}`,
-    },
-    body: JSON.stringify(message),
-  });
-
-  const result = await response.json();
-  if (!response.ok) {
-    const err = new Error(result.error || 'Failed to send push notification');
-    err.statusCode = response.status;
-    throw err;
-  }
-
-  return result;
+  return await userService.sendPushNotification(
+    user._id,
+    '💧 Hydration Reminder!',
+    'Time to drink water and stay on track with your hydration goals!'
+  );
 };
 
 module.exports = {

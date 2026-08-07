@@ -12,6 +12,7 @@ const authRoutes = require('./routes/authRoutes');
 const userRoutes = require('./routes/userRoutes');
 const hydrationRoutes = require('./routes/hydrationRoutes');
 const errorHandler = require('./middleware/errorHandler');
+const { initReminderScheduler } = require('./services/reminderScheduler');
 
 const app = express();
 const PORT = process.env.PORT || 4000;
@@ -36,6 +37,7 @@ app.use(errorHandler);
 
 const startServer = async () => {
   await connectDb();
+  initReminderScheduler();
   const server = app.listen(PORT, HOST, () => {
     console.log(`Hydration Tracker backend is running on http://${HOST}:${PORT}`);
   });
