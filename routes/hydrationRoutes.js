@@ -8,8 +8,8 @@ router.use(authMiddleware);
 
 // Hydration Log Endpoints
 router.post('/log', hydrationController.logWater);
-router.delete('/log/:id', hydrationController.deleteWaterLog); // <-- Route for deleting a specific log
 router.delete('/log/today', hydrationController.clearTodayLog); // <-- Route for clearing all logs today
+router.delete('/log/:id', hydrationController.deleteWaterLog); // <-- Route for deleting a specific log
 
 // Stats Endpoints
 router.get('/stats/daily', hydrationController.getDailyStats);

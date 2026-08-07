@@ -1,3 +1,4 @@
+const mongoose = require('mongoose');
 const WaterLog = require('../models/WaterLog');
 const User = require('../models/User');
 const { getPeriodKey, updateEmaValue } = require('../utils/ema');
@@ -66,6 +67,9 @@ const logWater = async (user, { amount, timestamp }) => {
  * Delete a single log entry by its document ID for a specific user
  */
 const deleteLogById = async (logId, userId) => {
+  if (!mongoose.Types.ObjectId.isValid(logId)) {
+    return null;
+  }
   // Hard delete from database matching document _id and user _id
   return await WaterLog.findOneAndDelete({ _id: logId, user: userId });
 };
